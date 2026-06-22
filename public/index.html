@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Product Catalog</title>
+    <style>
+      body {
+        font-family: -apple-system, sans-serif;
+        max-width: 900px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        background: #fafafa;
+      }
+      h1 {
+        font-size: 1.4rem;
+      }
+      .controls {
+        margin-bottom: 1rem;
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+      }
+      select,
+      button {
+        padding: 0.5rem 0.8rem;
+        font-size: 0.95rem;
+        border-radius: 6px;
+        border: 1px solid #ccc;
+      }
+      button {
+        cursor: pointer;
+        background: #222;
+        color: white;
+        border: none;
+      }
+      button:disabled {
+        background: #999;
+        cursor: not-allowed;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 0.6rem 0.8rem;
+        border-bottom: 1px solid #eee;
+        font-size: 0.9rem;
+      }
+      th {
+        background: #f0f0f0;
+      }
+      .meta {
+        color: #666;
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Product Catalog</h1>
+    <div class="controls">
+      <select id="categoryFilter">
+        <option value="">All categories</option>
+      </select>
+      <button id="resetBtn">Reset / Refresh feed</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Category</th>
+          <th>Price</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="meta" id="meta"></div>
+    <button id="loadMoreBtn">Load more</button>
+
+    <script>
+      let nextCursor = null;
+      let currentCategory = "";
+
+      async function loadCategories() {
+        const res = await fetch("/categories");
+        const { categories } = await res.json();
+        const select = document.getElementById("categoryFilter");
+        categories.forEach((c) => {
+          const opt = document.createElement("option");
+          opt.value = c;
+          opt.textContent = c;
+          select.appendChild(opt);
+        });
+      }
+
+      async function loadPage(reset = false) {
+        if (reset) {
+          nextCursor = null;
+          document.getElementById("rows").innerHTML = "";
+        }
+        const params = new URLSearchParams({ limit: 20 });
+        if (currentCategory) params.set("category", currentCategory);
+        if (nextCursor) params.set("cursor", nextCursor);
+
+        const res = await fetch("/products?" + params.toString());
+        const { data, nextCursor: newCursor, hasMore } = await res.json();
+
+        const tbody = document.getElementById("rows");
+        data.forEach((p) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td>${p.id}</td><td>${p.name}</td><td>${p.category}</td><td>$${p.price}</td><td>${new Date(p.created_at).toLocaleString()}</td>`;
+          tbody.appendChild(tr);
+        });
+
+        nextCursor = newCursor;
+        document.getElementById("loadMoreBtn").disabled = !hasMore;
+        document.getElementById("meta").textContent = hasMore
+          ? "More available — keep loading."
+          : "End of results.";
+      }
+
+      document
+        .getElementById("loadMoreBtn")
+        .addEventListener("click", () => loadPage(false));
+      document
+        .getElementById("resetBtn")
+        .addEventListener("click", () => loadPage(true));
+      document
+        .getElementById("categoryFilter")
+        .addEventListener("change", (e) => {
+          currentCategory = e.target.value;
+          loadPage(true);
+        });
+
+      loadCategories();
+      loadPage(true);
+    </script>
+  </body>
+</html>
